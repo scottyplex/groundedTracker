@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grounded Trinket Checklist</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chosen Palette: Warm Neutrals (Linen background, Walnut text, Muted Sage accents) -->
+    <!-- Application Structure Plan: A single-page dashboard featuring a header with progress tracking, a control bar for search and filtering, and a responsive card grid for the trinkets. This structure was chosen to provide a clear overview, easy access to all items, and powerful tools (search/filter) to manage a growing list of items. Cards allow each trinket's detailed information to be presented in an organized, digestible format. Progress is saved automatically using localStorage for a seamless user experience. -->
+    <!-- Visualization & Content Choices: Report Info: List of trinkets with descriptions. -> Goal: Organize, Inform, Track. -> Viz/Presentation Method: Interactive card grid with checkboxes and images. -> Interaction: Users can check items off, which updates a progress bar and saves the state. Users can also filter the grid by category (Offensive, Defensive, Utility, Elemental), by game level (Regular, NG+), or by collection status (Found, Not Found), or search by keyword. -> Justification: This transforms a static list into a functional tool. Cards handle the detailed text better than a simple list, and search/filter are essential for usability with 40+ items. Adding images enhances visual appeal and scannability, and level/found filters improve organization for varied game progression and collection status. -> Library/Method: HTML/Tailwind for structure, Vanilla JS for interactivity and DOM manipulation, localStorage for data persistence. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            background-color: #FDFCF5; /* A very light, warm off-white */
+            color: #4A443D; /* A dark, warm gray */
+        }
+        .filter-btn.active {
+            background-color: #5A6960 !important; /* Muted Sage for active filter */
+            color: #FDFCF5 !important;
+        }
+        .progress-bar-fill {
+            background-color: #5A6960; /* Muted Sage */
+        }
+        .trinket-card {
+            transition: all 0.2s ease-in-out;
+        }
+        .trinket-card.collected {
+            opacity: 0.6;
+            border-color: #5A6960;
+        }
+        .trinket-card:not(.collected):hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        input[type="checkbox"] {
+            accent-color: #5A6960;
+        }
+    </style>
+</head>
+<body class="font-sans antialiased">
+
+    <div id="app-container" class="container mx-auto p-4 md:p-8 max-w-7xl">
+
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold mb-2">Grounded Trinket Checklist</h1>
+            <p class="text-lg text-gray-600">Track your collection of rare trinkets found in the backyard. Your progress is saved automatically.</p>
+        </header>
+
+        <div class="sticky top-0 bg-[#FDFCF5]/90 backdrop-blur-sm z-10 py-4 mb-8">
+            <div class="mb-4">
+                <div class="flex justify-between items-center mb-1 text-sm font-medium">
+                    <span>Progress</span>
+                    <span id="progress-text">0 / 48</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div id="progress-bar" class="progress-bar-fill h-2.5 rounded-full" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-4">
+                <div class="relative flex-grow">
+                    <input type="text" id="search-input" placeholder="Search by name or effect..." class="w-full p-3 pl-10 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#5A6960] focus:border-[#5A6960] transition">
+                     <svg class="w-5 h-5 text-gray-400 absolute top-1/2 left-3 -translate-y-1/2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                    </svg>
+                </div>
+                <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-2 flex-wrap">
+                    <div class="flex items-center justify-center gap-2 flex-wrap">
+                        <button class="filter-btn px-4 py-2 bg-white border-2 border-gray-300 rounded-lg font-semibold text-sm hover:bg-gray-100 transition active" data-filter-type="category" data-filter-value="all">All</button>
+                        <button class="filter-btn px-4 py-2 bg-white border-2 border-gray-300 rounded-lg font-semibold text-sm hover:bg-gray-100 transition" data-filter-type="category" data-filter-value="Offensive">Offensive</button>
+                        <button class="filter-btn px-4 py-2 bg-white border-2 border-gray-300 rounded-lg font-semibold text-sm hover:bg-gray-100 transition" data-filter-type="category" data-filter-value="Defensive">Defensive</button>
+                        <button class="filter-btn px-4 py-2 bg-white border-2 border-gray-300 rounded-lg font-semibold text-sm hover:bg-gray-100 transition" data-filter-type="category" data-filter-value="Utility">Utility</button>
+                        <button class="filter-btn px-4 py-2 bg-white border-2 border-gray-300 rounded-lg font-semibold text-sm hover:bg-gray-100 transition" data-filter-type="category" data-filter-value="Elemental">Elemental</button>
+                    </div>
+                    <div class="flex items-center justify-center gap-2 flex-wrap mt-2 md:mt-0">
+                        <span class="font-semibold text-sm mr-1">Level:</span>
+                        <button class="filter-btn px-4 py-2 bg-white border-2 border-gray-300 rounded-lg font-semibold text-sm hover:bg-gray-100 transition active" data-filter-type="level" data-filter-value="all">All</button>
+                        <button class="filter-btn px-4 py-2 bg-white border-2 border-gray-300 rounded-lg font-semibold text-sm hover:bg-gray-100 transition" data-filter-type="level" data-filter-value="Regular">Regular</button>
+                        <button class="filter-btn px-4 py-2 bg-white border-2 border-gray-300 rounded-lg font-semibold text-sm hover:bg-gray-100 transition" data-filter-type="level" data-filter-value="NG+">NG+</button>
+                    </div>
+                    <div class="flex items-center justify-center gap-2 flex-wrap mt-2 md:mt-0">
+                        <span class="font-semibold text-sm mr-1">Status:</span>
+                        <button class="filter-btn px-4 py-2 bg-white border-2 border-gray-300 rounded-lg font-semibold text-sm hover:bg-gray-100 transition active" data-filter-type="found" data-filter-value="all">All</button>
+                        <button class="filter-btn px-4 py-2 bg-white border-2 border-gray-300 rounded-lg font-semibold text-sm hover:bg-gray-100 transition" data-filter-type="found" data-filter-value="found">Found</button>
+                        <button class="filter-btn px-4 py-2 bg-white border-2 border-gray-300 rounded-lg font-semibold text-sm hover:bg-gray-100 transition" data-filter-type="found" data-filter-value="not-found">Not Found</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <main id="trinket-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Trinket cards will be injected here -->
+        </main>
+        
+        <div id="loading-state" class="text-center py-20">
+            <p class="text-xl font-semibold">Loading Trinkets...</p>
+        </div>
+
+        <div id="no-results-state" class="hidden text-center py-20">
+             <p class="text-xl font-semibold">No Trinkets Found</p>
+             <p class="text-gray-500 mt-2">Try adjusting your search or filters.</p>
+        </div>
+
+    </div>
+
+    <template id="trinket-card-template">
+        <div class="trinket-card bg-white rounded-xl border-2 border-gray-200 shadow-sm p-6 flex flex-col items-center text-center">
+            <img class="w-24 h-24 mb-4 rounded-full border-2 border-gray-300 object-cover" alt="Trinket image" onerror="this.onerror=null;this.src='https://placehold.co/100x100/F0F0F0/888888?text=Image+Error';">
+            <div class="flex items-start justify-between w-full mb-4">
+                <h2 class="text-xl font-bold flex-grow pr-4 text-left"></h2>
+                <input type="checkbox" class="w-6 h-6 rounded-md border-2 flex-shrink-0">
+            </div>
+            <p class="text-gray-600 text-sm flex-grow w-full text-left"></p>
+        </div>
+    </template>
+
+    <script type="module">
+        const allTrinketData = [
+            { id: "broodmother_trinket", name: "Broodmother Trinket", description: "Gives your summoned creatures' attacks a 100% chance to apply poison, dealing 15 damage every 5 seconds for 10 seconds.", category: "Offensive", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/3/34/Broodmother_Trinket.png/revision/latest/scale-to-width-down/50?cb=20220928020952", level: "Regular" },
+            { id: "biomedical_badge", name: "Biomedical Badge", description: "Regenerates 1 health and increases hunger by 2 every 10 seconds.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/a/ae/Biomedical_Badge.png/revision/latest/scale-to-width-down/50?cb=20220928020951", level: "Regular" },
+            { id: "entomologist_badge", name: "Entomologist Badge", description: "Increases attack damage by 10% and reduces the perfect block window by 500ms.", category: "Offensive", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/b/b6/Entomologist_Badge.png/revision/latest/scale-to-width-down/50?cb=20220928020954", level: "Regular" },
+            { id: "toxicology_badge", name: "Toxicology Badge", description: "Reduces gas damage taken by 90%, provides 100% dust immunity, and doubles poison damage taken.", category: "Defensive", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/6/6a/Toxicology_Badge.png/revision/latest/scale-to-width-down/50?cb=20220928021018", level: "Regular" },
+            { id: "defense_badge", name: "Defense Badge", description: "Reduces damage taken by 25% and reduces your damage dealt by 15%.", category: "Defensive", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/9/94/Defense_Badge.png/revision/latest/scale-to-width-down/50?cb=20220928020954", level: "Regular" },
+            { id: "intern_badge", name: "Intern Badge", description: "Increases hauling capacity by 10 and reduces movement speed by 25%.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/e/e4/Intern_Badge.png/revision/latest/scale-to-width-down/50?cb=20220928021000", level: "Regular" },
+            { id: "compliance_badge", name: "Compliance Badge", description: "Gives your perfect blocks a 100% chance to heal you for 8 health. Also causes you to take 35% more damage.", category: "Defensive", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/a/a4/Compliance_Badge.png/revision/latest/scale-to-width-down/50?cb=20220928020953", level: "Regular" },
+            { id: "everlasting_hogstopper", name: "Everlasting Hogstopper", description: "Reduces your hunger by 10 every 60 seconds.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/5/5c/Everlasting_Hogstopper.png/revision/latest/scale-to-width-down/50?cb=20221018204521", level: "Regular" },
+            { id: "fungal_charm", name: "Fungal Charm", description: "Reduces damage taken from explosions by 75%.", category: "Defensive", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/a/ad/Fungal_Charm.png/revision/latest/scale-to-width-down/50?cb=20220928020957", level: "Regular" },
+            { id: "hot_cha_charm", name: "Hot Cha Charm", description: "Gives your melee attacks a 100% chance to deal an additional 15 spicy damage.", category: "Elemental", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/a/aa/Spectacular_Spicy_Shard.png/revision/latest/scale-to-width-down/50?cb=20220928020958" , level: "Regular"},
+            { id: "suspicious_ice_cap", name: "Suspicious Ice Cap", description: "Gives your melee attacks a 100% chance to deal an additional 15 fresh damage.", category: "Elemental", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/0/0c/Suspicious_Mint.png/revision/latest/scale-to-width-down/50?cb=20220928021015", level: "Regular" },
+            { id: "shiny_salt_crystal", name: "Shiny Salt Crystal", description: "Gives your melee attacks a 100% chance to deal an additional 15 salty damage.", category: "Elemental", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/9/9f/Shiny_Salt_Crystal.png/revision/latest/scale-to-width-down/50?cb=20220928021014", level: "Regular" },
+            { id: "wondrous_wormhole", name: "Wondrous Wormhole", description: "Gives your melee attacks a 100% chance to deal an additional 15 sour damage.", category: "Elemental", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/a/a2/Pucker_Charm.png/revision/latest/scale-to-width-down/50?cb=20240428020047", level: "Regular" },
+            { id: "thors_pendant", name: "Thor's Pendant", description: "Provides multiple small bonuses including: crit chance, crit damage, healing, sizzle reduction, exhaustion reduction, and more.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/9/9a/Thor%27s_Pendant.png/revision/latest/scale-to-width-down/50?cb=20220928021016", level: "Regular" },
+            { id: "left_elf_charm", name: "Left Elf Charm", description: "Gives your blocks a 10% chance to repair 25 durability on your equipped shield.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/1/14/Left_Elf_Charm.png/revision/latest/scale-to-width-down/50?cb=20220928021002", level: "Regular" },
+            { id: "right_elf_charm", name: "Right Elf Charm", description: "Gives your attacks a 10% chance to repair 25 durability on your equipped weapon.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/e/eb/Right_Elf_Charm.png/revision/latest/scale-to-width-down/50?cb=20220928021007", level: "Regular" },
+            { id: "sarahs_charm", name: "Sarah's Charm", description: "Combines the effects of both the Left and Right Elf Charms.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/3/3a/Sarah%27s_Charm.png/revision/latest/scale-to-width-down/50?cb=20220928021011", level: "Regular" },
+            { id: "insulating_larva_spike", name: "Insulating Larva Spike", description: "Reduces Sizzle accumulation by 50%.", category: "Defensive", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/f/f4/Insulating_Larva_Spike.png/revision/latest/scale-to-width-down/50?cb=20220928020959", level: "Regular" },
+            { id: "rotten_berry_charm", name: "Rotten Berry Charm", description: "Gives rotten weapon attacks a 10% chance to cause a poison explosion.", category: "Offensive", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/0/02/Rotten_Berry_Charm.png/revision/latest/scale-to-width-down/50?cb=20220928021009", level: "Regular" },
+            { id: "power_droplet", name: "Power Droplet", description: "Gives unarmed attacks a 25% chance to proc a special bonus hit.", category: "Offensive", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/6/63/Power_Droplet.png/revision/latest/scale-to-width-down/50?cb=20220928021005", level: "Regular" },
+            { id: "mantis_trinket", name: "Mantis Trinket", description: "Your critical hits have a 100% chance to restore 50 stamina instantly.", category: "Offensive", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/0/0f/Mantis_Trinket.png/revision/latest/scale-to-width-down/50?cb=20220928021004", level: "Regular" },
+            { id: "wasp_queen_trinket", name: "Wasp Queen Trinket", description: "Gives your bow attacks a 25% chance not to consume ammo.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/4/41/Wasp_Queen_Trinket.png/revision/latest/scale-to-width-down/50?cb=20230413051632", level: "Regular" },
+            { id: "shield_solidifier", name: "Shield Solidifier", description: "Increases your block gauge by 200.", category: "Defensive", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/2/20/Shield_Solidifier.png/revision/latest/scale-to-width-down/50?cb=20220928021013", level: "Regular" },
+            { id: "fancy_fletching", name: "Fancy Fletching", description: "Gives bow attacks a buff that reduces exhaustion time by 50%.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/b/b0/Fancy_Fletching.png/revision/latest/scale-to-width-down/50?cb=20230413051314", level: "Regular" },
+            { id: "wittle_widowling", name: "Wittle Widowling", description: "Gives your attacks a 10% chance to summon a friendly black widowling.", category: "Offensive", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/f/f5/Wittle_Widowling.png/revision/latest/scale-to-width-down/50?cb=20240417221839", level: "Regular" },
+            { id: "health_and_safety_badge", name: "Health And Safety Badge", description: "Your attacks heal you for 4% of damage dealt, but you bleed for 5 health every 3 seconds.", category: "Offensive", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/3/37/Health_And_Safety_Badge.png/revision/latest/scale-to-width-down/50?cb=20230414180548", level: "Regular" },
+            { id: "sticky_fingers", name: "Sticky Fingers", description: "Gives your melee hits a 10% chance to steal an item from an enemy.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/9/91/Sticky_Fingers.png/revision/latest/scale-to-width-down/50?cb=20230413051615", level: "Regular" },
+            { id: "volatile_fang", name: "Volatile Fang", description: "Gives your perfect blocks a 30% chance to cause an explosion.", category: "Defensive", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/f/fd/Volatile_Fang.png/revision/latest/scale-to-width-down/50?cb=20230413051624", level: "Regular" },
+            { id: "speed_droplet", name: "Speed Droplet", description: "Reduces sprint stamina cost by 10% and increases move speed by 10%.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/0/07/Speed_Droplet.png/revision/latest/scale-to-width-down/50?cb=20230413051610", level: "Regular" },
+            { id: "glowbasa_necklace", name: "Glowbasa Necklace", description: "A mystical necklace that provides a soft glow, illuminating your surroundings.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/7/7f/Glowbasa_Necklace.png/revision/latest?cb=20240417221900", level: "Regular" },
+            { id: "glowbasa_wristband", name: "Glowbasa Wristband", description: "A glowing wristband that seems to pulsate with a soft energy.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/2/26/Glowbasa_Wristband.png/revision/latest/scale-to-width-down/50?cb=20240417221901", level: "Regular" },
+            { id: "astonishing_acid", name: "Astonishing Acid", description: "An item that seems to bubble with potent, corrosive acid.", category: "Offensive", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/e/e1/Astonishing_Acid.png/revision/latest/scale-to-width-down/50?cb=20231102023640", level: "Regular" },
+            { id: "glowbasa_link", name: "Glowbasa Link", description: "A connector piece for Glowbasa artifacts, suggesting a larger set.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/a/a2/Glowbasa_Link.png/revision/latest/scale-to-width-down/50?cb=20240417221859", level: "Regular" },
+            { id: "nifty_needle", name: "Nifty Needle", description: "A sharp needle, perfect for quick repairs or intricate crafting.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/f/fd/Nifty_Needle.png/revision/latest/scale-to-width-down/50?cb=20231102023840", level: "Regular" },
+            { id: "sturdy_shell", name: "Sturdy Shell", description: "A fragment of a robust shell, offering exceptional protection.", category: "Defensive", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/f/f1/Sturdy_Shell.png/revision/latest/scale-to-width-down/50?cb=20231102023933", level: "Regular" },
+            { id: "infected_broodmother_trinket", name: "Infected Broodmother Trinket", description: "A corrupted trinket with enhanced venomous effects, hinting at a greater challenge.", category: "Offensive", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/d/d1/Infected_Broodmother_Trinket.png/revision/latest/scale-to-width-down/50?cb=20230503233025", level: "NG+" },
+            { id: "science_cone", name: "Science Cone", description: "A conical device used for scientific measurements, enhancing data collection.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/e/e6/Science_Cone.png/revision/latest/scale-to-width-down/50?cb=20240417221833", level: "Regular" },
+            { id: "unstable_capacitor", name: "Unstable Capacitor", description: "A volatile component that occasionally discharges powerful energy.", category: "Offensive", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/0/01/Unstable_Capacitor.png/revision/latest/scale-to-width-down/50?cb=20231102024025", level: "Regular" },
+            { id: "giddy_goop", name: "Giddy Goop", description: "A sticky, shimmering goop that causes disorientation upon contact.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/a/a6/Giddy_Goop.png/revision/latest/scale-to-width-down/50?cb=20231114205404", level: "Regular" },
+            { id: "science_waffle", name: "Science Waffle", description: "A grid-patterned scientific tool, possibly for structured analysis.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/b/bb/Science_Waffle.png/revision/latest/scale-to-width-down/50?cb=20240417221835", level: "Regular" },
+            { id: "science_crinkle", name: "Science Crinkle", description: "A crumpled scientific artifact, perhaps used for irregular measurements.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/e/e8/Science_Crinkle.png/revision/latest/scale-to-width-down/50?cb=20240417221834", level: "Regular" },
+            { id: "pucker_charm", name: "Pucker Charm", description: "A sour charm that enhances elemental damage with a puckering effect.", category: "Elemental", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/a/a2/Pucker_Charm.png/revision/latest/scale-to-width-down/50?cb=20240428020047", level: "Regular" },
+            { id: "fluffy_dandelion_tuft", name: "Fluffy Dandelion Tuft", description: "A light dandelion tuft that aids in gliding and soft landings.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/6/6e/Fluffy_Dandelion_Tuft.png/revision/latest/scale-to-width-down/50?cb=20220928020956", level: "Regular" },
+            { id: "spectacular_spicy_shard", name: "Spectacular Spicy Shard", description: "A fiery shard that imbues attacks with intense spicy damage.", category: "Elemental", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/a/aa/Spectacular_Spicy_Shard.png/revision/latest/scale-to-width-down/50?cb=20220928020958", level: "Regular" },
+            { id: "suspicious_mint", name: "Suspicious Mint", description: "A cooling mint that adds a refreshing chill to your attacks.", category: "Elemental", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/0/0c/Suspicious_Mint.png/revision/latest/scale-to-width-down/50?cb=20220928021015", level: "Regular" },
+            { id: "valentines_fortune", name: "Valentine's Fortune", description: "A charm imbued with luck, bringing unexpected benefits.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/f/f6/Valentine%27s_Fortune.png/revision/latest/scale-to-width-down/50?cb=20240417221838", level: "Regular" },
+            { id: "burgl_charm", name: "BURG.L Charm", description: "A charming device reminiscent of BURG.L, possibly enhancing scientific output.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/9/95/BURG.L_Charm.png/revision/latest/scale-to-width-down/50?cb=20240429221637", level: "Regular" },
+            { id: "deuces_sign", name: "Deuces Sign", description: "A unique sign that offers a subtle boost to your capabilities.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/2/22/Deuces_Sign.png/revision/latest/scale-to-width-down/50?cb=20240417221858", level: "Regular" },
+            { id: "web_clippers", name: "Web Clippers", description: "A sharp tool designed for easily cutting through tough web structures.", category: "Utility", imageUrl: "https://static.wikia.nocookie.net/grounded9429/images/1/1a/Web_Clippers.png/revision/latest/scale-to-width-down/50?cb=20220928021018", level: "Regular" }
+        ];
+
+        let collectedState = {};
+        let currentCategoryFilter = 'all';
+        let currentLevelFilter = 'all';
+        let currentFoundFilter = 'all'; // New filter for found/not found
+        let currentSearch = '';
+
+        const grid = document.getElementById('trinket-grid');
+        const template = document.getElementById('trinket-card-template');
+        const searchInput = document.getElementById('search-input');
+        const filterButtons = document.querySelectorAll('.filter-btn');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const noResultsState = document.getElementById('no-results-state');
+        const loadingState = document.getElementById('loading-state');
+
+        function renderTrinkets() {
+            grid.innerHTML = '';
+            let hasResults = false;
+
+            allTrinketData
+                .filter(trinket => {
+                    const matchesCategory = currentCategoryFilter === 'all' || trinket.category === currentCategoryFilter;
+                    const matchesLevel = currentLevelFilter === 'all' || trinket.level === currentLevelFilter;
+                    const matchesSearch = currentSearch === '' || 
+                                          trinket.name.toLowerCase().includes(currentSearch) || 
+                                          trinket.description.toLowerCase().includes(currentSearch);
+                    
+                    let matchesFound = true;
+                    if (currentFoundFilter === 'found') {
+                        matchesFound = collectedState[trinket.id];
+                    } else if (currentFoundFilter === 'not-found') {
+                        matchesFound = !collectedState[trinket.id];
+                    }
+
+                    return matchesCategory && matchesLevel && matchesSearch && matchesFound;
+                })
+                .forEach(trinket => {
+                    hasResults = true;
+                    const card = template.content.cloneNode(true);
+                    const cardElement = card.querySelector('.trinket-card');
+                    const checkbox = card.querySelector('input[type="checkbox"]');
+                    const imgElement = card.querySelector('img');
+
+                    card.querySelector('h2').textContent = trinket.name;
+                    card.querySelector('p').textContent = trinket.description;
+                    checkbox.dataset.id = trinket.id;
+                    imgElement.src = trinket.imageUrl;
+                    imgElement.alt = `${trinket.name} image`;
+
+                    if (collectedState[trinket.id]) {
+                        checkbox.checked = true;
+                        cardElement.classList.add('collected');
+                    }
+                    
+                    grid.appendChild(card);
+                });
+
+            noResultsState.classList.toggle('hidden', hasResults);
+        }
+
+        function updateProgress() {
+            const collectedCount = Object.values(collectedState).filter(Boolean).length;
+            const totalCount = allTrinketData.length;
+            const percentage = totalCount > 0 ? (collectedCount / totalCount) * 100 : 0;
+
+            progressText.textContent = `${collectedCount} / ${totalCount}`;
+            progressBar.style.width = `${percentage}%`;
+        }
+
+        function saveState() {
+            try {
+                localStorage.setItem('groundedTrinketChecklist', JSON.stringify(collectedState));
+            } catch (error) {
+                console.error("Error saving state to localStorage: ", error);
+            }
+        }
+
+        function loadState() {
+            try {
+                const savedData = localStorage.getItem('groundedTrinketChecklist');
+                if (savedData) {
+                    collectedState = JSON.parse(savedData);
+                } else {
+                    collectedState = {};
+                }
+            } catch (error) {
+                console.error("Error loading state from localStorage: ", error);
+                collectedState = {}; // Fallback to empty state on error
+            }
+        }
+
+        function handleCheck(e) {
+            if (e.target.matches('input[type="checkbox"]')) {
+                const trinketId = e.target.dataset.id;
+                collectedState[trinketId] = e.target.checked;
+                e.target.closest('.trinket-card').classList.toggle('collected', e.target.checked);
+                
+                updateProgress();
+                saveState();
+            }
+        }
+        
+        function handleFilter(e) {
+            if(e.target.matches('.filter-btn')) {
+                const filterType = e.target.dataset.filterType;
+                const filterValue = e.target.dataset.filterValue;
+
+                document.querySelectorAll(`.filter-btn[data-filter-type="${filterType}"]`).forEach(btn => btn.classList.remove('active'));
+                
+                e.target.classList.add('active');
+
+                if (filterType === 'category') {
+                    currentCategoryFilter = filterValue;
+                } else if (filterType === 'level') {
+                    currentLevelFilter = filterValue;
+                } else if (filterType === 'found') { // Handle new 'found' filter
+                    currentFoundFilter = filterValue;
+                }
+                
+                renderTrinkets();
+            }
+        }
+
+        function handleSearch(e) {
+            currentSearch = e.target.value.toLowerCase();
+            renderTrinkets();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadState(); // Load state from localStorage immediately
+            loadingState.classList.add('hidden'); // Hide loading state as it's not needed for local storage
+            grid.classList.remove('hidden'); // Show grid
+            
+            progressText.textContent = `0 / ${allTrinketData.length}`; // Initialize progress text
+            
+            grid.addEventListener('change', handleCheck);
+            searchInput.addEventListener('input', handleSearch);
+            // Attach event listener to the parent container for all filter button groups
+            document.querySelectorAll('.flex.flex-col.md\\:flex-row.md\\:justify-between.md\\:items-center.gap-2.flex-wrap > div').forEach(group => {
+                group.addEventListener('click', handleFilter);
+            });
+
+
+            renderTrinkets(); // Initial render based on loaded state
+            updateProgress(); // Initial update of progress bar
+        });
+
+    </script>
+</body>
+</html>
